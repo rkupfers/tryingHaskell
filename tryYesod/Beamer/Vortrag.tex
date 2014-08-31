@@ -1,0 +1,276 @@
+\documentclass{beamer}
+\usepackage{beamerthemeshadow}
+\usepackage[utf8]{inputenc}
+\begin{document}
+\title{Software Transactional Memory}  
+\author{Robert Kupferschmied, Matrikel 59112}
+\date{\today} 
+\frame{\titlepage} 
+
+\frame{\frametitle{Inhaltsverzeichnis}\tableofcontents[sections={1-2}]} 
+\frame{\frametitle{Inhaltsverzeichnis}\tableofcontents[sections={3}]}
+
+\section{Einführung}
+\subsection{Prozess, Thread, Spark} 
+\frame{\frametitle{Prozess, Thread, Spark}
+\begin{itemize}
+\item Prozess: Algorithmisch ablaufende Informationsverarbeitung\\
+	Prozesse können unterbrochen werden\\
+	\begin{description}
+		\item[Bereit:] Besitzt alle Ressourcen, wartet auf Prozessorzuordnung
+		\item[Laufend:] Ist aktuell dem Prozessor zugeordnet
+		\item[Wartend:] Ist durch Betriebssystem unterbrochen wartet auf Betriebsmittel
+	\end{description}
+	\item Thread: Leichtgewichtiger Prozess\\
+		Teilt sich Betriebsmittel mit anderen Threads,\\ besitzt eigenen Stack\\
+	\item Spark: leichtgewichtiger Thread, wird vom Laufzeitsystem gestartet\\
+\end{itemize}	
+}
+\subsection{Verschränkung}
+\frame{
+	\frametitle{Verschränkung}
+	Threads können gleichzeitg auf gleiche Betriebsmittel zugreifen.\\
+	\centering
+	\vspace{0.5cm}
+	\begin{tabular}{|l|l|}
+		\hline Java Code & Pseudo Assembler \\ 
+		\hline i++;  & mov a,0x00 //Adresse der Variable \\
+ 					 & inc a\\
+ 					 & mov 0x00,a\\
+		\hline 
+	\end{tabular}
+}
+
+\frame{\frametitle{Anzahl möglicher Verschränkung} 
+	\begin{figure}
+\centering
+\includegraphics[width=3.5cm,height=3.5cm]{../Vortrag/Verschraenkung}
+\caption{Mögliche Wege}
+\label{fig:MgWege}
+\end{figure}
+\begin{itemize}
+	\item 6! = 24 mögliche Wege\\
+	\item Testen ist sehr aufwendig!!!
+\end{itemize}
+}
+\subsection{Threadsynchronisation}
+\frame{\frametitle{Threadsynchronisation}
+	\textbf{Blockierung}\\
+	\begin{itemize}
+	\item Implementation durch Semaphore\\
+	\item von Dijkstra konzipiert\\
+	\end{itemize}
+	Semaphor l -$>$ 2 Operationen: \begin{enumerate}
+	\item l.lock
+	\item l.unlock
+	\end{enumerate}
+	\qquad \\
+	In Java: \\
+	\qquad Object lock;\\
+	\qquad Synchronized(lock)\{ ... \};\\
+}
+\frame{\frametitle{Mutex Variablen in Haskell}
+	Mutex = mutual exclusion = Wechselseitiger Ausschluss\\
+	\qquad \\
+	\begin{itemize}
+	\item	takeMVar :: MVar a -$>$ IO a   -- Block when MVar is empty\\
+	\item	putMVar :: MVar a -$>$ a -$>$ IO () --Block when MVar is full\\
+	\item	tryTakeMVar :: MVar a -$>$ IO (Maybe a) –Noneblocking\\
+	\item	tryPutMVar :: MVar a -$>$ a -$>$ IO Bool  --Noneblocking\\
+	\end{itemize}
+	
+}
+\frame{\frametitle{Deadlock / Dining Philosophers}
+	\begin{figure}
+	\centering
+	\includegraphics[width=0.7\linewidth,height=6.5cm]{../Vortrag/578px-Dining_philosophers}
+	\caption{Dining Philosophers}
+	\label{fig:578px-Dining_philosophers}
+	\end{figure}
+ 
+}
+\frame{\frametitle{Atomare Operationen/Feingranular}
+	\begin{itemize}
+	\item atomar = unteilbar\\
+	\end{itemize}
+	\textbf{Atomic-Bibliothek in Java} \\
+	Bsp: \\
+	\qquad AtomicLong al = new AtomicLong(0);\\
+	\qquad al.getAndIncrement(); //ist ein atomarer Maschinenbefehl\\
+}
+\section{Software Transactional Memory}
+\frame{\frametitle{Software Transactional Memory}
+	\begin{itemize}
+	\item	Technik zur Vereinfachung von nebenläufiger Programme\\
+	\item	Erlaubt Operationen die den Status von Variablen ändern\\
+	\item	Diese Änderungen werden atomar ausgeführt\\
+	\item	Man kann mehrere Operationen zu atomaren Blöcken zusammenfassen\\
+	\item	Die Transaktionen werden durch Transaktionsmanager durchgeführt\\
+	\end{itemize}
+}
+\frame{\frametitle{Ablauf einer Transaktion} 
+	\begin{itemize}
+	\item 	Transaktionen sind atomare Blöcke\\
+	\item 	Es gibt einen Transaktionsmanager\\
+	\item 	Transaktionsmanager besitzt einen Log\\
+	\item 	Daten werden in Log geschrieben\\
+	\item 	Im Log werden die Veränderungen gespeichert\\
+	\item 	Nach Transaktion werden die Änderungen im Log im Hauptspeicher atomar übernommen ("commit", vgl. SQL)\\
+	\item 	Es wird nur ein "commit" ausgeführt wenn Daten mit Log konsistent mit HS, ansonsten muss Transaktion wiederholt werden
+	\end{itemize}
+	
+}
+\subsection{Die Bibliothek - Control.Concurrent.STM}
+	\frame{\frametitle{Die Bibliothek - Control.Concurrent.STM}
+	\begin{itemize}
+		\item atomically:: STM a -$>$ IO a\\
+		\item newTVar:: a -$>$ STM (TVar a)\\
+		\item readTVar:: TVar a -$>$ STM a\\
+		\item writeTVar:: TVar a -$>$ a -$>$ STM ()\\
+		\item retry:: STM a\\
+		\item orElse:: STM a -$>$ STM a -$>$ STM a\\
+		\item throwSTM:: Exception e =$>$ e -$>$ STM a\\
+		\item catchSTM:: Exception e =$>$ STM a -$>$ (e -$>$ STM a) -$>$ STM a\\
+	\end{itemize}
+}
+\subsection{Eine Transaktion}
+	\frame{\frametitle{Eine Transaktion}
+		atomInc :: Num a =$>$ TVar a -$>$ STM ()\\
+		atomInc x = do \\
+		\qquad i $<$- readTVar x -- lesen des aktuellen Status\\
+		\qquad writeTVar x (i+1) -- Veränderung im Log\\
+		main = do \\
+		\qquad shared $<$- atomically \$ newTVar 0\\
+		\qquad atomically \$ atomInc shared\\
+		\begin{itemize}
+		\item atomically ruft den Transaktionsmanager auf
+		\item Keine IO Aktion in Transaktion möglich 
+		\end{itemize}
+		
+	}
+\subsection{Blocking – Retry}
+\frame{\frametitle{Blocking – Retry}
+	retry :: STM a\\
+	\begin{itemize}
+	\item retry blockiert den aktuellen Spark bis sich die die Variablen ändern\\
+	\end{itemize}
+	Bsp:\\ 
+	takeForks f1 f2 = atomically \$ do\\
+	\qquad b1 $<$- readTVar f1\\
+	\qquad b2 $<$- readTVar f2\\
+	\qquad if(b1 \&\& b2) then( do\\
+	\qquad writeTVar f1 False\\
+	\qquad writeTVar f2 False) else retry
+}
+\subsection{orElse}
+\frame{\frametitle{orElse}
+	orElse    :: STM a -$>$ STM a -$>$ STM a\\
+	\qquad \\
+	Wirkung: \\
+	\begin{enumerate}
+	\item Die erste Transaktion wird durchgeführt. Falls sie ein Ergebnis zurückliefert, endet orElse\\
+	\item Falls die erste Transaktion retry aufruft. Wird die zweite Transaktion durchgeführt\\
+	\end{enumerate}
+}
+\subsection{Yesod und STM}
+\frame{\frametitle{Yesod und STM}
+\begin{itemize}
+	\item STM ist eine eigenständige Bibliothek\\
+	\item Webserver sind parallele Programme\\
+	\item Jeder Client bekommt sein eigenen Thread\\
+	\item Vorteilhaft gemeinsamen Speicher über STM zu synchronisieren:\\
+	\begin{enumerate}
+	\item Keine/kaum Deadlocks
+	\item Keine Verschränkungseffekte
+	\end{enumerate}
+\end{itemize}
+	
+}
+\section{Vor- und Nachteile}
+\frame{\frametitle{Vor- und Nachteile}
+	STM bietet eine Reihe von Vorteilen.\\
+	\begin{enumerate}
+	\item zusammensetzbare Atomare Blöcke
+	\item nicht Blockierend
+	\end{enumerate}
+	Frage: Warum brauche ich noch MVars?\\
+	\begin{itemize}
+	\item takeMVar ist schneller als takeTMVar\\
+	\item Code wird aber nicht automatisch schneller durch die Benutzung von MVars!!!\\
+	\end{itemize}
+}
+\subsection{Fairness}
+\frame{\frametitle{Fairness}
+\begin{itemize}
+	\item MVars sind fair\\
+	\item Mehrere Threads greifen auf MVar zu, dann werden die Threads im Fifo Prinzip abgearbeitet\\
+	\item STM hat diese Möglichkeit nicht\\
+	\item Hier werden alle wartenden Threads "aufgeweckt", wenn sich die Variable ändert\\
+	\item Keine Echtzeitanwendungen!!!
+\end{itemize}
+	
+}
+\subsection{Performance}
+\frame{\frametitle{Kosten von Transaktionen}
+	\begin{description}
+		\item[writeTVar] übernimmt nur Änderung im Log\\
+		\item[readTVar] muss das Protokoll durchgehen -$>$ Prüfung ob es von früherem writeTVar beschrieben wurde\\readTVar hat Kosten von O(n), n = Anz. der Log Einträge\\
+		\item[retry] bracht den Log, hier werden readTVars ausgewertet
+		\item[commit] 1.(Nicht Konsistent) Verwerfen einer Transaktion ist billig\\ 2.(Konsistent) Sperren aller beteiligten TVars und schreiben des Logs
+	\end{description}
+}
+\frame{\frametitle{Faustregeln zur Verbesserung}
+\begin{enumerate}
+\item Immer eine feste Anz. von TVars lesen. Sonst enstehen Kosten von O(n$^{2}$).\\
+\item Transaktionen sollten gleich lang sein.\\
+\end{enumerate}
+Bsp:\\
+atomically \$ mapM takeTMVar ts //Kosten O(n$^2$)\\
+mapM (atomically . takeTMVar) ts //Kosten n*O(n)
+}
+\subsection{Hardware Transactional Memory}
+\frame{\frametitle{Hardware Transactional Memory}
+\textbf{Problem:} Prozessor-Cache behindert Parallelität.\\
+\begin{itemize}
+\item Transaktionsmanager muss Log in HS auswerten.\\
+\end{itemize}
+\textbf{Idee:}
+\begin{itemize}
+	\item jeder Prozessor erhält 2 Caches, einen für Transaktionen und einen regulären, diese sind exklusiv
+	\item transaktionale Cache erhält zusätzliche Logik, die commit und retry erleichtern
+	\item vorläufiges Schreiben nicht im HS sichtbar.
+\end{itemize}
+}
+\subsection{Quellen}
+\frame{\frametitle{Quellen}
+	\begin{itemize}
+		\item http://chimera.labs.oreilly.com/books/1230000000929/\\ch10.html\#sec\_stm-cost\\
+		\item https://github.com/simonmar/parconc-examples\\
+		\item https://github.com/yesodweb/yesod/wiki/Keeping\\-(in-memory)-state-with-yesod\\
+		\item http://de.wikipedia.org/wiki/Transactional\_Memory\\
+		\item http://rosettacode.org/wiki/Dining\_philosophers
+		\item http://www.cs.brown.edu/~mph/HerlihyM93/\\herlihy93transactional.pdf
+	\end{itemize}
+}
+
+\subsection{Zusammenfassung}
+\frame{\frametitle{Zusammenfassung}
+Pro:
+\begin{itemize}
+	\item Umfangreiche Bibliothek zur Threadsynchronisierung
+	\item einfache Benutzung, ohne Deadlocks oder Verschränkungseffekte
+	\item Möglichkeit atomare Blöcke zu definieren
+\end{itemize} 
+Contra: 
+\begin{itemize}
+	\item STM ist nicht fair
+	\item Lange Transaktionen committen nie.
+\end{itemize} 
+}
+\frame{\frametitle{weitere Beispiele}
+\begin{itemize}
+	\item STM Channel
+	\item Raucherproblem (TMVars)
+	\item STM-Scala
+\end{itemize}}
+\end{document}
